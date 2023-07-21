@@ -1,4 +1,4 @@
-module github.com/larry0x/simapp
+module simapp
 
 go 1.19
 

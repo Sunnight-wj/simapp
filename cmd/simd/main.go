@@ -1,6 +1,7 @@
 package main
 
 import (
+	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	"io"
 	"os"
 
@@ -24,8 +25,9 @@ import (
 	authcmd "github.com/cosmos/cosmos-sdk/x/auth/client/cli"
 	"github.com/cosmos/cosmos-sdk/x/auth/types"
 	genutilcli "github.com/cosmos/cosmos-sdk/x/genutil/client/cli"
+	genutiltypes "github.com/cosmos/cosmos-sdk/x/genutil/types"
 
-	simapp "github.com/larry0x/simapp/app"
+	simapp "simapp/app"
 )
 
 func init() {
@@ -139,7 +141,7 @@ func initAppConfig() (string, interface{}) {
 	//   own app.toml to override, or use this default value.
 	//
 	// In simapp, we set the min gas prices to 0.
-	srvCfg.MinGasPrices = "0utoken"
+	srvCfg.MinGasPrices = "0usim"
 
 	customAppConfig := CustomAppConfig{
 		Config: *srvCfg,
@@ -172,6 +174,8 @@ func genesisCommand() *cobra.Command {
 	cmd.AddCommand(
 		genutilcli.ValidateGenesisCmd(simapp.ModuleBasics),
 		genutilcli.AddGenesisAccountCmd(simapp.DefaultNodeHome),
+		genutilcli.GenTxCmd(simapp.ModuleBasics, simapp.MakeEncodingConfig().TxConfig, banktypes.GenesisBalancesIterator{}, simapp.DefaultNodeHome),
+		genutilcli.CollectGenTxsCmd(banktypes.GenesisBalancesIterator{}, simapp.DefaultNodeHome, genutiltypes.DefaultMessageValidator),
 	)
 
 	return cmd

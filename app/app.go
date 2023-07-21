@@ -2,13 +2,12 @@ package simapp
 
 import (
 	"encoding/json"
-	"io"
-	"os"
-	"path/filepath"
-
 	dbm "github.com/cometbft/cometbft-db"
 	abci "github.com/cometbft/cometbft/abci/types"
 	"github.com/cometbft/cometbft/libs/log"
+	"io"
+	"os"
+	"path/filepath"
 
 	"github.com/cosmos/cosmos-sdk/baseapp"
 	"github.com/cosmos/cosmos-sdk/client"
@@ -36,12 +35,18 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/bank"
 	bankkeeper "github.com/cosmos/cosmos-sdk/x/bank/keeper"
 	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
-	consensus "github.com/cosmos/cosmos-sdk/x/consensus"
+	"github.com/cosmos/cosmos-sdk/x/consensus"
 	consensusparamkeeper "github.com/cosmos/cosmos-sdk/x/consensus/keeper"
 	consensusparamtypes "github.com/cosmos/cosmos-sdk/x/consensus/types"
+	"github.com/cosmos/cosmos-sdk/x/genutil"
+	genutiltypes "github.com/cosmos/cosmos-sdk/x/genutil/types"
+	"github.com/cosmos/cosmos-sdk/x/staking"
+	stakingkeeper "github.com/cosmos/cosmos-sdk/x/staking/keeper"
+	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 
-	"github.com/larry0x/simapp/x/poa"
-	poatypes "github.com/larry0x/simapp/x/poa/types"
+	_ "simapp/app/params"
+	//"simapp/x/poa"
+	//poatypes "simapp/x/poa/types"
 )
 
 const (
@@ -52,25 +57,26 @@ const (
 	//
 	// The seed phrase is:
 	//
-	// crumble soon   hockey  pigeon  border   health
-	// human   cotton romance fork    mountain rapid
-	// scan    swarm  basic   subject tornado  genius
-	// parade  stone  coyote  pluck   journey  fatal
-	authority = "cosmos1tqr9a9m9nk0c22uq2c2slundmqhtnrnhwks7x0"
+	// kidney such salute naive ten lift fence detect help bronze daughter fly lock shy orient long rice woman enough recycle hotel occur situate expect
+	authority = "sim1pe5g3av3237ysv6e40mzdsc9rlcv52apffdw0d"
 )
 
 var (
 	DefaultNodeHome string
 
 	ModuleBasics = module.NewBasicManager(
+		genutil.AppModuleBasic{},
 		auth.AppModuleBasic{},
 		bank.AppModuleBasic{},
+		staking.AppModuleBasic{},
 		consensus.AppModuleBasic{},
-		poa.AppModuleBasic{},
+		//poa.AppModuleBasic{},
 	)
 
 	maccPerms = map[string][]string{
-		authtypes.FeeCollectorName: nil,
+		authtypes.FeeCollectorName:     nil,
+		stakingtypes.BondedPoolName:    {authtypes.Burner, authtypes.Staking},
+		stakingtypes.NotBondedPoolName: {authtypes.Burner, authtypes.Staking},
 	}
 )
 
@@ -94,6 +100,7 @@ type SimApp struct {
 	AccountKeeper         authkeeper.AccountKeeper
 	BankKeeper            bankkeeper.Keeper
 	ConsensusParamsKeeper consensusparamkeeper.Keeper
+	StakingKeeper         *stakingkeeper.Keeper
 
 	ModuleManager *module.Manager
 	configurator  module.Configurator
@@ -105,7 +112,7 @@ func init() {
 		panic(err)
 	}
 
-	DefaultNodeHome = filepath.Join(userHomeDir, ".simapp")
+	DefaultNodeHome = filepath.Join(userHomeDir, ".simd")
 }
 
 func NewSimApp(
@@ -134,6 +141,7 @@ func NewSimApp(
 	keys := sdk.NewKVStoreKeys(
 		authtypes.StoreKey,
 		banktypes.StoreKey,
+		stakingtypes.StoreKey,
 		consensusparamtypes.StoreKey,
 	)
 	tkeys := sdk.NewTransientStoreKeys()
@@ -155,7 +163,7 @@ func NewSimApp(
 		keys[authtypes.StoreKey],
 		authtypes.ProtoBaseAccount,
 		maccPerms,
-		sdk.Bech32MainPrefix,
+		"sim",
 		authority,
 	)
 
@@ -167,6 +175,14 @@ func NewSimApp(
 		authority,
 	)
 
+	app.StakingKeeper = stakingkeeper.NewKeeper(
+		app.cdc,
+		keys[stakingtypes.StoreKey],
+		app.AccountKeeper,
+		app.BankKeeper,
+		authority,
+	)
+
 	app.ConsensusParamsKeeper = consensusparamkeeper.NewKeeper(
 		app.cdc,
 		keys[consensusparamtypes.StoreKey],
@@ -175,31 +191,39 @@ func NewSimApp(
 	bApp.SetParamStore(&app.ConsensusParamsKeeper)
 
 	app.ModuleManager = module.NewManager(
+		genutil.NewAppModule(app.AccountKeeper, app.StakingKeeper, app.BaseApp.DeliverTx, encCfg.TxConfig),
 		auth.NewAppModule(app.cdc, app.AccountKeeper, authsims.RandomGenesisAccounts, nil),
 		bank.NewAppModule(app.cdc, app.BankKeeper, app.AccountKeeper, nil),
+		staking.NewAppModule(app.cdc, app.StakingKeeper, app.AccountKeeper, app.BankKeeper, nil),
 		consensus.NewAppModule(app.cdc, app.ConsensusParamsKeeper),
-		poa.NewAppModule(),
+		//poa.NewAppModule(),
 	)
 
 	app.ModuleManager.SetOrderBeginBlockers(
-		poatypes.ModuleName,
+		stakingtypes.ModuleName,
+		//poatypes.ModuleName,
 		authtypes.ModuleName,
 		banktypes.ModuleName,
 		consensusparamtypes.ModuleName,
+		genutiltypes.ModuleName,
 	)
 
 	app.ModuleManager.SetOrderEndBlockers(
-		poatypes.ModuleName,
+		stakingtypes.ModuleName,
+		//poatypes.ModuleName,
 		authtypes.ModuleName,
 		banktypes.ModuleName,
 		consensusparamtypes.ModuleName,
+		genutiltypes.ModuleName,
 	)
 
 	genesisModuleOrder := []string{
 		authtypes.ModuleName,
 		banktypes.ModuleName,
-		poatypes.ModuleName,
+		//poatypes.ModuleName,
+		stakingtypes.ModuleName,
 		consensusparamtypes.ModuleName,
+		genutiltypes.ModuleName,
 	}
 	app.ModuleManager.SetOrderInitGenesis(genesisModuleOrder...)
 	app.ModuleManager.SetOrderExportGenesis(genesisModuleOrder...)

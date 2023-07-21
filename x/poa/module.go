@@ -16,7 +16,7 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/module"
 
-	"github.com/larry0x/simapp/x/poa/types"
+	"simapp/x/poa/types"
 )
 
 var (
